@@ -1,0 +1,178 @@
+// Prisma schema for Ledger — mirrors src/lib/mock-data types (+ AuditLogEntry)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ClientType {
+  individual
+  business
+}
+
+enum ReturnStatus {
+  not_started     @map("not-started")
+  in_progress     @map("in-progress")
+  pending_review  @map("pending-review")
+  ready_to_file   @map("ready-to-file")
+  filed
+
+  @@map("return_status")
+}
+
+enum FieldState {
+  ai_generated    @map("ai-generated")
+  verified
+  editable
+  needs_approval  @map("needs-approval")
+  locked
+
+  @@map("field_state")
+}
+
+enum FlagStatus {
+  pending
+  accepted
+  rejected
+  edited
+
+  @@map("flag_status")
+}
+
+enum AuditAction {
+  flag_accepted
+  flag_rejected
+  flag_edited
+  field_edited
+
+  @@map("audit_action")
+}
+
+model Client {
+  id       String     @id
+  name     String
+  type     ClientType
+  initials String
+
+  taxReturns TaxReturn[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("clients")
+}
+
+model TaxReturn {
+  id                   String       @id
+  clientId             String       @map("client_id")
+  taxYear              Int          @map("tax_year")
+  status               ReturnStatus
+  dueDate              DateTime     @map("due_date") @db.Date
+  assignedCPA          String       @map("assigned_cpa")
+  completenessPercent  Int          @map("completeness_percent")
+
+  client    Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  documents Document[]
+  fields    ReturnField[]
+  flags     AIFlag[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([clientId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("tax_returns")
+}
+
+model Document {
+  id             String   @id
+  returnId       String   @map("return_id")
+  name           String
+  type           String
+  uploadedAt     DateTime @map("uploaded_at")
+  pageCount      Int      @map("page_count")
+  thumbnailLabel String   @map("thumbnail_label")
+
+  taxReturn     TaxReturn     @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  sourcedFields ReturnField[] @relation("FieldSourceDocument")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([returnId])
+  @@map("documents")
+}
+
+model ReturnField {
+  id               String     @id
+  returnId         String     @map("return_id")
+  label            String
+  value            String
+  state            FieldState
+  sourceDocumentId String?    @map("source_document_id")
+  sourcePage       Int?       @map("source_page")
+  calculation      String?
+  confidence       Int?
+
+  taxReturn      TaxReturn      @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  sourceDocument Document?      @relation("FieldSourceDocument", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  flags          AIFlag[]
+  auditLogs      AuditLogEntry[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([returnId])
+  @@index([sourceDocumentId])
+  @@index([state])
+  @@map("return_fields")
+}
+
+model AIFlag {
+  id              String     @id
+  returnId        String     @map("return_id")
+  fieldId         String     @map("field_id")
+  message         String
+  reasoning       String
+  confidence      Int
+  evidenceDocIds  String[]   @map("evidence_doc_ids")
+  suggestedAction String     @map("suggested_action")
+  status          FlagStatus @default(pending)
+
+  taxReturn TaxReturn       @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  field     ReturnField     @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  auditLogs AuditLogEntry[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([returnId])
+  @@index([fieldId])
+  @@index([status])
+  @@map("ai_flags")
+}
+
+model AuditLogEntry {
+  id            String      @id @default(cuid())
+  flagId        String?     @map("flag_id")
+  fieldId       String?     @map("field_id")
+  action        AuditAction
+  performedBy   String      @map("performed_by")
+  previousValue String?     @map("previous_value")
+  newValue      String?     @map("new_value")
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  flag  AIFlag?      @relation(fields: [flagId], references: [id], onDelete: SetNull)
+  field ReturnField? @relation(fields: [fieldId], references: [id], onDelete: SetNull)
+
+  @@index([flagId])
+  @@index([fieldId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_log_entries")
+}

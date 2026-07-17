@@ -61,21 +61,39 @@ export function needsReview(
 }
 
 /**
- * Assign each active (non-filed) return to exactly one section,
+ * Core urgency computation, decoupled from any data source so it can be
+ * shared by the dashboard (mock data) and API routes (Prisma rows).
+ * Assigns each active (non-filed) return to exactly one section,
  * highest urgency wins.
  */
+export function computeUrgencySection(
+  status: ReturnStatus,
+  dueDate: string,
+  pendingFlagCount: number,
+  now = new Date()
+): UrgencySection | null {
+  if (status === "filed") return null;
+
+  const days = daysUntilDue(dueDate, now);
+  if (days < 0) return "overdue";
+  if (days <= 7) return "due-this-week";
+  if (status === "pending-review" || pendingFlagCount > 0)
+    return "needs-review";
+  return "on-track";
+}
+
+/** Object-shaped convenience wrapper around computeUrgencySection. */
 export function getUrgencySection(
   taxReturn: TaxReturn,
   pendingFlagCount: number,
   now = new Date()
 ): UrgencySection | null {
-  if (taxReturn.status === "filed") return null;
-
-  const days = daysUntilDue(taxReturn.dueDate, now);
-  if (days < 0) return "overdue";
-  if (days <= 7) return "due-this-week";
-  if (needsReview(taxReturn, pendingFlagCount)) return "needs-review";
-  return "on-track";
+  return computeUrgencySection(
+    taxReturn.status,
+    taxReturn.dueDate,
+    pendingFlagCount,
+    now
+  );
 }
 
 export function groupReturnsByUrgency(
