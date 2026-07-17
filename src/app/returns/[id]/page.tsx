@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { ReturnDetailView } from "@/components/returns/return-detail-view";
-import { getReturnDetail } from "@/lib/data/returns";
+import { getAuditLogEntries, getReturnDetail } from "@/lib/data/returns";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +27,8 @@ export default async function ReturnDetailPage({
   const detail = await getReturnDetail(id);
   if (!detail) notFound();
 
+  const auditEntries = (await getAuditLogEntries(id)) ?? [];
+
   return (
     <ReturnDetailView
       taxReturn={detail.taxReturn}
@@ -34,6 +36,7 @@ export default async function ReturnDetailPage({
       fields={detail.fields}
       documents={detail.documents}
       flags={detail.flags}
+      auditEntries={auditEntries}
     />
   );
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Building2, Loader2, User } from "lucide-react";
 import { toast } from "sonner";
 
+import { ActivityLog } from "@/components/returns/activity-log";
 import { AIFlagDialog } from "@/components/returns/ai-flag-dialog";
 import { FieldRow } from "@/components/returns/field-row";
 import { FieldStateLegend } from "@/components/returns/field-state-legend";
@@ -12,6 +13,8 @@ import { SourceTraceDialog } from "@/components/returns/source-trace-dialog";
 import { Badge } from "@/components/ui/badge";
 import type {
   ApiErrorResponse,
+  AuditLogEntryDTO,
+  AuditLogResponse,
   FlagAction,
   FlagActionResponse,
   ReturnFieldWithSource,
@@ -39,6 +42,7 @@ interface ReturnDetailViewProps {
   fields: ReturnFieldWithSource[];
   documents: Document[];
   flags: AIFlag[];
+  auditEntries: AuditLogEntryDTO[];
 }
 
 export function ReturnDetailView({
@@ -47,10 +51,14 @@ export function ReturnDetailView({
   fields: initialFields,
   documents,
   flags: initialFlags,
+  auditEntries: initialAuditEntries,
 }: ReturnDetailViewProps) {
   // Hydrated from the server; updated from PATCH responses (DB is source of truth)
   const [fields, setFields] = useState<ReturnField[]>(initialFields);
   const [flags, setFlags] = useState<AIFlag[]>(initialFlags);
+  const [auditEntries, setAuditEntries] = useState<AuditLogEntryDTO[]>(
+    initialAuditEntries
+  );
   const [sourceFieldId, setSourceFieldId] = useState<string | null>(null);
   const [activeFlagId, setActiveFlagId] = useState<string | null>(null);
   const [resolvingAction, setResolvingAction] = useState<FlagAction | null>(
@@ -143,6 +151,16 @@ export function ReturnDetailView({
         prev.map((item) => (item.id === data.field.id ? data.field : item))
       );
       setActiveFlagId(null);
+
+      // Refresh the activity log so the new audit entry shows immediately
+      fetch(`/api/returns/${taxReturn.id}/audit-log`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((log: AuditLogResponse | null) => {
+          if (log) setAuditEntries(log.entries);
+        })
+        .catch(() => {
+          // Non-critical; the log will catch up on next page load
+        });
     } catch {
       toast.error("Couldn't reach the server. Try again.");
     } finally {
@@ -244,6 +262,13 @@ export function ReturnDetailView({
           </ul>
         </div>
       </section>
+
+      <ActivityLog
+        entries={auditEntries}
+        fieldLabels={Object.fromEntries(
+          fields.map((field) => [field.id, field.label])
+        )}
+      />
 
       <SourceTraceDialog
         open={sourceFieldId != null}

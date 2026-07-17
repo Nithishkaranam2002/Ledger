@@ -1,4 +1,5 @@
 import type {
+  AuditLogEntryDTO,
   ReturnDetailResponse,
   ReturnFieldWithSource,
   ReturnSummary,
@@ -91,4 +92,36 @@ export async function getReturnDetail(
     documents: [...row.documents, ...evidenceDocs].map(serializeDocument),
     flags: row.flags.map(serializeAIFlag),
   };
+}
+
+/** Audit entries for a return, newest first. Returns null if the return doesn't exist. */
+export async function getAuditLogEntries(
+  returnId: string
+): Promise<AuditLogEntryDTO[] | null> {
+  const taxReturn = await prisma.taxReturn.findUnique({
+    where: { id: returnId },
+    select: { id: true },
+  });
+  if (!taxReturn) return null;
+
+  const rows = await prisma.auditLogEntry.findMany({
+    where: {
+      OR: [
+        { field: { returnId } },
+        { flag: { returnId } },
+      ],
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    flagId: row.flagId,
+    fieldId: row.fieldId,
+    action: row.action,
+    performedBy: row.performedBy,
+    previousValue: row.previousValue,
+    newValue: row.newValue,
+    createdAt: row.createdAt.toISOString(),
+  }));
 }
