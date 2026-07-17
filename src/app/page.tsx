@@ -1,20 +1,45 @@
-import { mockClients, mockFlags, mockReturns } from "@/lib/mock-data";
+import Link from "next/link";
+
+import { ReturnCard } from "@/components/dashboard/return-card";
+import type { ReturnSummary } from "@/lib/api-types";
 import {
   SECTION_LABELS,
   SECTION_ORDER,
-  countPendingFlags,
-  groupReturnsByUrgency,
-} from "@/lib/urgency";
+  groupSummariesByUrgency,
+} from "@/lib/dashboard";
+import { getReturnSummaries } from "@/lib/data/returns";
 
-import { ReturnCard } from "@/components/dashboard/return-card";
+export const dynamic = "force-dynamic";
 
 const CPA_NAME = "Sarah Kim";
 
-export default function DashboardPage() {
-  const clientsById = Object.fromEntries(
-    mockClients.map((client) => [client.id, client])
-  );
-  const grouped = groupReturnsByUrgency(mockReturns, mockFlags);
+export default async function DashboardPage() {
+  let returns: ReturnSummary[];
+  try {
+    returns = await getReturnSummaries();
+  } catch {
+    return (
+      <main className="mx-auto w-full max-w-3xl px-4 py-16 sm:px-6">
+        <div className="mx-auto max-w-sm text-center">
+          <h1 className="text-lg font-semibold tracking-tight">
+            Couldn&apos;t load returns
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            The database may be unavailable. Check that Postgres is running,
+            then refresh.
+          </p>
+          <Link
+            href="/"
+            className="mt-5 inline-block text-sm font-medium underline-offset-4 hover:underline"
+          >
+            Try again
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  const grouped = groupSummariesByUrgency(returns);
 
   const attentionCount = SECTION_ORDER.filter((s) => s !== "on-track").reduce(
     (sum, section) => sum + grouped[section].length,
@@ -44,8 +69,8 @@ export default function DashboardPage() {
 
       <div className="flex flex-col gap-6">
         {SECTION_ORDER.map((section) => {
-          const returns = grouped[section];
-          if (returns.length === 0) return null;
+          const sectionReturns = grouped[section];
+          if (sectionReturns.length === 0) return null;
 
           return (
             <section key={section} aria-labelledby={`section-${section}`}>
@@ -57,27 +82,19 @@ export default function DashboardPage() {
                   {SECTION_LABELS[section]}
                 </h2>
                 <span className="text-xs tabular-nums text-muted-foreground">
-                  {returns.length}
+                  {sectionReturns.length}
                 </span>
               </div>
               <ul className="flex flex-col gap-2">
-                {returns.map((taxReturn) => {
-                  const client = clientsById[taxReturn.clientId];
-                  if (!client) return null;
-
-                  return (
-                    <li key={taxReturn.id}>
-                      <ReturnCard
-                        taxReturn={taxReturn}
-                        client={client}
-                        pendingFlagCount={countPendingFlags(
-                          taxReturn.id,
-                          mockFlags
-                        )}
-                      />
-                    </li>
-                  );
-                })}
+                {sectionReturns.map((taxReturn) => (
+                  <li key={taxReturn.id}>
+                    <ReturnCard
+                      taxReturn={taxReturn}
+                      client={taxReturn.client}
+                      pendingFlagCount={taxReturn.flagCount}
+                    />
+                  </li>
+                ))}
               </ul>
             </section>
           );

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Pencil, X } from "lucide-react";
+import { Check, Loader2, Pencil, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -12,7 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { AIFlag, Document, FlagStatus, ReturnField } from "@/lib/mock-data";
+import type { FlagAction } from "@/lib/api-types";
+import type { AIFlag, Document, ReturnField } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 interface AIFlagDialogProps {
@@ -21,7 +22,8 @@ interface AIFlagDialogProps {
   flag: AIFlag | null;
   field: ReturnField | null;
   evidenceDocs: Document[];
-  onResolve: (flagId: string, status: Exclude<FlagStatus, "pending">) => void;
+  resolvingAction: FlagAction | null;
+  onResolve: (flagId: string, action: FlagAction) => void | Promise<void>;
 }
 
 export function AIFlagDialog({
@@ -30,9 +32,11 @@ export function AIFlagDialog({
   flag,
   field,
   evidenceDocs,
+  resolvingAction,
   onResolve,
 }: AIFlagDialogProps) {
   const isPending = flag?.status === "pending";
+  const isSaving = resolvingAction != null;
   const confidence = flag
     ? Math.min(100, Math.max(0, flag.confidence))
     : 0;
@@ -41,11 +45,11 @@ export function AIFlagDialog({
     <Dialog
       open={open && flag != null}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen) onOpenChange(false);
+        if (!nextOpen && !isSaving) onOpenChange(false);
       }}
     >
       {flag ? (
-        <DialogContent className="sm:max-w-lg" showCloseButton>
+        <DialogContent className="sm:max-w-lg" showCloseButton={!isSaving}>
           <DialogHeader>
             <DialogTitle className="leading-snug pr-6">
               {flag.message}
@@ -150,7 +154,7 @@ export function AIFlagDialog({
                 Resolved: {flag.status}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                This AI flag has already been handled for this session.
+                This AI flag has already been handled.
               </p>
             </div>
           )}
@@ -158,39 +162,50 @@ export function AIFlagDialog({
           {isPending ? (
             <DialogFooter className="sm:justify-stretch">
               <div className="flex w-full flex-col gap-2 sm:flex-row">
-                {/*
-                  stopPropagation on pointerdown prevents the dialog from
-                  dismissing before click fires (which left flags stuck pending).
-                */}
                 <button
                   type="button"
+                  disabled={isSaving}
                   className={cn(buttonVariants(), "flex-1")}
                   onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() => onResolve(flag.id, "accepted")}
+                  onClick={() => onResolve(flag.id, "accept")}
                 >
-                  <Check className="size-3.5" />
-                  Accept suggestion
+                  {resolvingAction === "accept" ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Check className="size-3.5" />
+                  )}
+                  {resolvingAction === "accept" ? "Saving…" : "Accept suggestion"}
                 </button>
                 <button
                   type="button"
+                  disabled={isSaving}
                   className={cn(buttonVariants({ variant: "outline" }), "flex-1")}
                   onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() => onResolve(flag.id, "rejected")}
+                  onClick={() => onResolve(flag.id, "reject")}
                 >
-                  <X className="size-3.5" />
-                  Reject
+                  {resolvingAction === "reject" ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <X className="size-3.5" />
+                  )}
+                  {resolvingAction === "reject" ? "Saving…" : "Reject"}
                 </button>
                 <button
                   type="button"
+                  disabled={isSaving}
                   className={cn(
                     buttonVariants({ variant: "secondary" }),
                     "flex-1"
                   )}
                   onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() => onResolve(flag.id, "edited")}
+                  onClick={() => onResolve(flag.id, "edit")}
                 >
-                  <Pencil className="size-3.5" />
-                  Edit manually
+                  {resolvingAction === "edit" ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Pencil className="size-3.5" />
+                  )}
+                  {resolvingAction === "edit" ? "Saving…" : "Edit manually"}
                 </button>
               </div>
             </DialogFooter>

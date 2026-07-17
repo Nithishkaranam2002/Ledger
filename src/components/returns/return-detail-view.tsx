@@ -1,21 +1,26 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Building2, User } from "lucide-react";
+import { ArrowLeft, Building2, Loader2, User } from "lucide-react";
+import { toast } from "sonner";
 
 import { AIFlagDialog } from "@/components/returns/ai-flag-dialog";
 import { FieldRow } from "@/components/returns/field-row";
 import { FieldStateLegend } from "@/components/returns/field-state-legend";
 import { SourceTraceDialog } from "@/components/returns/source-trace-dialog";
 import { Badge } from "@/components/ui/badge";
+import type {
+  ApiErrorResponse,
+  FlagAction,
+  FlagActionResponse,
+  ReturnFieldWithSource,
+} from "@/lib/api-types";
 import { correctedValueForFlag } from "@/lib/fake-edit";
 import type {
   AIFlag,
   Client,
   Document,
-  FieldState,
-  FlagStatus,
   ReturnField,
   TaxReturn,
 } from "@/lib/mock-data";
@@ -26,15 +31,12 @@ import {
 } from "@/lib/urgency";
 import { cn } from "@/lib/utils";
 
-interface FieldOverride {
-  state?: FieldState;
-  value?: string;
-}
+const CPA_NAME = "Sarah Kim";
 
 interface ReturnDetailViewProps {
   taxReturn: TaxReturn;
   client: Client;
-  fields: ReturnField[];
+  fields: ReturnFieldWithSource[];
   documents: Document[];
   flags: AIFlag[];
 }
@@ -46,40 +48,13 @@ export function ReturnDetailView({
   documents,
   flags: initialFlags,
 }: ReturnDetailViewProps) {
-  // Local session state — source of truth for flag resolution while the page is open
-  const [flagStatuses, setFlagStatuses] = useState<Record<string, FlagStatus>>(
-    () =>
-      Object.fromEntries(
-        initialFlags.map((flag) => [flag.id, flag.status] as const)
-      )
-  );
-  const [fieldOverrides, setFieldOverrides] = useState<
-    Record<string, FieldOverride>
-  >({});
+  // Hydrated from the server; updated from PATCH responses (DB is source of truth)
+  const [fields, setFields] = useState<ReturnField[]>(initialFields);
+  const [flags, setFlags] = useState<AIFlag[]>(initialFlags);
   const [sourceFieldId, setSourceFieldId] = useState<string | null>(null);
   const [activeFlagId, setActiveFlagId] = useState<string | null>(null);
-
-  const flags = useMemo<AIFlag[]>(
-    () =>
-      initialFlags.map((flag) => ({
-        ...flag,
-        status: flagStatuses[flag.id] ?? flag.status,
-      })),
-    [initialFlags, flagStatuses]
-  );
-
-  const fields = useMemo<ReturnField[]>(
-    () =>
-      initialFields.map((field) => {
-        const override = fieldOverrides[field.id];
-        if (!override) return field;
-        return {
-          ...field,
-          ...(override.state !== undefined ? { state: override.state } : {}),
-          ...(override.value !== undefined ? { value: override.value } : {}),
-        };
-      }),
-    [initialFields, fieldOverrides]
+  const [resolvingAction, setResolvingAction] = useState<FlagAction | null>(
+    null
   );
 
   const documentsById = useMemo(
@@ -124,48 +99,56 @@ export function ReturnDetailView({
   const TypeIcon = client.type === "business" ? Building2 : User;
   const pendingCount = flags.filter((f) => f.status === "pending").length;
 
-  const resolveFlag = useCallback(
-    (id: string, status: Exclude<FlagStatus, "pending">) => {
-      const flag = initialFlags.find((f) => f.id === id);
-      if (!flag) return;
+  async function resolveFlag(flagId: string, action: FlagAction) {
+    const flag = flags.find((f) => f.id === flagId);
+    const field = flag
+      ? fields.find((f) => f.id === flag.fieldId)
+      : undefined;
+    if (!flag || !field) return;
 
-      const fieldId = flag.fieldId;
-      const currentField =
-        initialFields.find((f) => f.id === fieldId) ??
-        fields.find((f) => f.id === fieldId);
+    const body: {
+      action: FlagAction;
+      performedBy: string;
+      newValue?: string;
+    } = {
+      action,
+      performedBy: CPA_NAME,
+    };
 
-      setFlagStatuses((prev) => ({ ...prev, [id]: status }));
+    if (action === "edit") {
+      body.newValue = correctedValueForFlag(flag, field.value);
+    }
 
-      if (status === "accepted") {
-        setFieldOverrides((prev) => ({
-          ...prev,
-          [fieldId]: { state: "verified" },
-        }));
-      } else if (status === "rejected") {
-        // Keep original field state/value — only the flag is dismissed
-        setFieldOverrides((prev) => {
-          const next = { ...prev };
-          delete next[fieldId];
-          return next;
-        });
-      } else {
-        setFieldOverrides((prev) => ({
-          ...prev,
-          [fieldId]: {
-            state: "editable",
-            value: correctedValueForFlag(
-              flag,
-              currentField?.value ?? prev[fieldId]?.value ?? ""
-            ),
-          },
-        }));
+    setResolvingAction(action);
+    try {
+      const response = await fetch(`/api/flags/${flagId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorBody = (await response.json().catch(() => null)) as
+          | ApiErrorResponse
+          | null;
+        toast.error(errorBody?.error ?? `Request failed (${response.status})`);
+        return;
       }
 
-      // Close after state updates are scheduled
+      const data = (await response.json()) as FlagActionResponse;
+      setFlags((prev) =>
+        prev.map((item) => (item.id === data.flag.id ? data.flag : item))
+      );
+      setFields((prev) =>
+        prev.map((item) => (item.id === data.field.id ? data.field : item))
+      );
       setActiveFlagId(null);
-    },
-    [initialFlags, initialFields, fields]
-  );
+    } catch {
+      toast.error("Couldn't reach the server. Try again.");
+    } finally {
+      setResolvingAction(null);
+    }
+  }
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
@@ -274,13 +257,21 @@ export function ReturnDetailView({
       <AIFlagDialog
         open={activeFlagId != null}
         onOpenChange={(open) => {
-          if (!open) setActiveFlagId(null);
+          if (!open && resolvingAction == null) setActiveFlagId(null);
         }}
         flag={activeFlag}
         field={flagField}
         evidenceDocs={evidenceDocs}
+        resolvingAction={resolvingAction}
         onResolve={resolveFlag}
       />
+
+      {resolvingAction ? (
+        <span className="sr-only" role="status">
+          Saving
+          <Loader2 className="inline size-3 animate-spin" />
+        </span>
+      ) : null}
     </main>
   );
 }

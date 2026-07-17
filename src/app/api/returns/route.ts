@@ -1,34 +1,9 @@
 import { NextResponse } from "next/server";
 
-import type { ReturnsResponse, ReturnSummary } from "@/lib/api-types";
-import { prisma } from "@/lib/prisma";
-import { serializeClient, serializeTaxReturn } from "@/lib/serializers";
-import { computeUrgencySection } from "@/lib/urgency";
+import type { ReturnsResponse } from "@/lib/api-types";
+import { getReturnSummaries } from "@/lib/data/returns";
 
 export async function GET() {
-  const rows = await prisma.taxReturn.findMany({
-    include: {
-      client: true,
-      _count: {
-        select: { flags: { where: { status: "pending" } } },
-      },
-    },
-    orderBy: [{ dueDate: "asc" }, { id: "asc" }],
-  });
-
-  const returns: ReturnSummary[] = rows.map((row) => {
-    const pendingFlagCount = row._count.flags;
-    const taxReturn = serializeTaxReturn(row, pendingFlagCount);
-    return {
-      ...taxReturn,
-      client: serializeClient(row.client),
-      urgency: computeUrgencySection(
-        taxReturn.status,
-        taxReturn.dueDate,
-        pendingFlagCount
-      ),
-    };
-  });
-
+  const returns = await getReturnSummaries();
   return NextResponse.json<ReturnsResponse>({ returns });
 }
