@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16
+    container_name: ledger-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ledger
+      POSTGRES_DB: ledger
+    ports:
+      # Host 5435 keeps out of the way of a local Postgres on 5432
+      - "5435:5432"
+    volumes:
+      - ledger-pgdata:/var/lib/postgresql/data
+
+volumes:
+  ledger-pgdata:
