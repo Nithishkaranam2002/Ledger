@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Loader2, Pencil, X } from "lucide-react";
+import { Check, Loader2, Lock, Pencil, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -23,6 +23,8 @@ interface AIFlagDialogProps {
   field: ReturnField | null;
   evidenceDocs: Document[];
   resolvingAction: FlagAction | null;
+  /** When false (e.g. Reviewer role), the dialog is read-only. */
+  canModify: boolean;
   onResolve: (flagId: string, action: FlagAction) => void | Promise<void>;
 }
 
@@ -33,6 +35,7 @@ export function AIFlagDialog({
   field,
   evidenceDocs,
   resolvingAction,
+  canModify,
   onResolve,
 }: AIFlagDialogProps) {
   const isPending = flag?.status === "pending";
@@ -159,7 +162,21 @@ export function AIFlagDialog({
             </div>
           )}
 
-          {isPending ? (
+          {isPending && !canModify ? (
+            <DialogFooter>
+              <div className="flex w-full items-center justify-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2.5">
+                <Lock
+                  className="size-3.5 shrink-0 text-muted-foreground"
+                  aria-hidden
+                />
+                <p className="text-xs font-medium text-muted-foreground">
+                  Reviewers cannot modify flags — read-only access
+                </p>
+              </div>
+            </DialogFooter>
+          ) : null}
+
+          {isPending && canModify ? (
             <DialogFooter className="sm:justify-stretch">
               <div className="flex w-full flex-col gap-2 sm:flex-row">
                 <button

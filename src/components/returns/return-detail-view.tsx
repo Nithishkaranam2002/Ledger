@@ -11,6 +11,8 @@ import { FieldRow } from "@/components/returns/field-row";
 import { FieldStateLegend } from "@/components/returns/field-state-legend";
 import { SourceTraceDialog } from "@/components/returns/source-trace-dialog";
 import { Badge } from "@/components/ui/badge";
+import { UserSwitcher } from "@/components/user-switcher";
+import { useCurrentUser } from "@/lib/current-user-context";
 import type {
   ApiErrorResponse,
   AuditLogEntryDTO,
@@ -34,8 +36,6 @@ import {
 } from "@/lib/urgency";
 import { cn } from "@/lib/utils";
 
-const CPA_NAME = "Sarah Kim";
-
 interface ReturnDetailViewProps {
   taxReturn: TaxReturn;
   client: Client;
@@ -53,6 +53,9 @@ export function ReturnDetailView({
   flags: initialFlags,
   auditEntries: initialAuditEntries,
 }: ReturnDetailViewProps) {
+  const { user } = useCurrentUser();
+  const canModifyFlags = user.role !== "reviewer";
+
   // Hydrated from the server; updated from PATCH responses (DB is source of truth)
   const [fields, setFields] = useState<ReturnField[]>(initialFields);
   const [flags, setFlags] = useState<AIFlag[]>(initialFlags);
@@ -108,6 +111,8 @@ export function ReturnDetailView({
   const pendingCount = flags.filter((f) => f.status === "pending").length;
 
   async function resolveFlag(flagId: string, action: FlagAction) {
+    if (!canModifyFlags) return;
+
     const flag = flags.find((f) => f.id === flagId);
     const field = flag
       ? fields.find((f) => f.id === flag.fieldId)
@@ -120,7 +125,7 @@ export function ReturnDetailView({
       newValue?: string;
     } = {
       action,
-      performedBy: CPA_NAME,
+      performedBy: user.name,
     };
 
     if (action === "edit") {
@@ -170,7 +175,7 @@ export function ReturnDetailView({
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
-      <div className="mb-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <Link
           href="/"
           className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
@@ -178,6 +183,7 @@ export function ReturnDetailView({
           <ArrowLeft className="size-3.5" aria-hidden />
           Dashboard
         </Link>
+        <UserSwitcher />
       </div>
 
       <header className="mb-4 border-b border-border pb-4">
@@ -288,6 +294,7 @@ export function ReturnDetailView({
         field={flagField}
         evidenceDocs={evidenceDocs}
         resolvingAction={resolvingAction}
+        canModify={canModifyFlags}
         onResolve={resolveFlag}
       />
 
