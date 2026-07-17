@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Building2, User } from "lucide-react";
 
@@ -9,7 +9,7 @@ import { FieldRow } from "@/components/returns/field-row";
 import { FieldStateLegend } from "@/components/returns/field-state-legend";
 import { SourceTraceDialog } from "@/components/returns/source-trace-dialog";
 import { Badge } from "@/components/ui/badge";
-import { fakeEditedValue } from "@/lib/fake-edit";
+import { correctedValueForFlag } from "@/lib/fake-edit";
 import type {
   AIFlag,
   Client,
@@ -29,7 +29,6 @@ import { cn } from "@/lib/utils";
 interface FieldOverride {
   state?: FieldState;
   value?: string;
-  dismissed?: boolean;
 }
 
 interface ReturnDetailViewProps {
@@ -47,15 +46,20 @@ export function ReturnDetailView({
   documents,
   flags: initialFlags,
 }: ReturnDetailViewProps) {
+  // Local session state — source of truth for flag resolution while the page is open
   const [flagStatuses, setFlagStatuses] = useState<Record<string, FlagStatus>>(
     () =>
-      Object.fromEntries(initialFlags.map((flag) => [flag.id, flag.status]))
+      Object.fromEntries(
+        initialFlags.map((flag) => [flag.id, flag.status] as const)
+      )
   );
   const [fieldOverrides, setFieldOverrides] = useState<
     Record<string, FieldOverride>
   >({});
+  const [sourceFieldId, setSourceFieldId] = useState<string | null>(null);
+  const [activeFlagId, setActiveFlagId] = useState<string | null>(null);
 
-  const flags = useMemo(
+  const flags = useMemo<AIFlag[]>(
     () =>
       initialFlags.map((flag) => ({
         ...flag,
@@ -64,15 +68,15 @@ export function ReturnDetailView({
     [initialFlags, flagStatuses]
   );
 
-  const fields = useMemo(
+  const fields = useMemo<ReturnField[]>(
     () =>
       initialFields.map((field) => {
         const override = fieldOverrides[field.id];
         if (!override) return field;
         return {
           ...field,
-          ...(override.state ? { state: override.state } : {}),
-          ...(override.value ? { value: override.value } : {}),
+          ...(override.state !== undefined ? { state: override.state } : {}),
+          ...(override.value !== undefined ? { value: override.value } : {}),
         };
       }),
     [initialFields, fieldOverrides]
@@ -82,6 +86,14 @@ export function ReturnDetailView({
     () => Object.fromEntries(documents.map((doc) => [doc.id, doc])),
     [documents]
   );
+
+  const flagByFieldId = useMemo(() => {
+    const map: Record<string, AIFlag> = {};
+    for (const flag of flags) {
+      map[flag.fieldId] = flag;
+    }
+    return map;
+  }, [flags]);
 
   const pendingFlagByFieldId = useMemo(() => {
     const map: Record<string, AIFlag> = {};
@@ -93,15 +105,12 @@ export function ReturnDetailView({
     return map;
   }, [flags]);
 
-  const [sourceFieldId, setSourceFieldId] = useState<string | null>(null);
-  const [flagId, setFlagId] = useState<string | null>(null);
-
   const sourceField = fields.find((f) => f.id === sourceFieldId) ?? null;
   const sourceDoc = sourceField?.sourceDocumentId
     ? (documentsById[sourceField.sourceDocumentId] ?? null)
     : null;
 
-  const activeFlag = flags.find((f) => f.id === flagId) ?? null;
+  const activeFlag = flags.find((f) => f.id === activeFlagId) ?? null;
   const flagField = activeFlag
     ? (fields.find((f) => f.id === activeFlag.fieldId) ?? null)
     : null;
@@ -115,49 +124,48 @@ export function ReturnDetailView({
   const TypeIcon = client.type === "business" ? Building2 : User;
   const pendingCount = flags.filter((f) => f.status === "pending").length;
 
-  function resolveFlag(
-    id: string,
-    status: Exclude<FlagStatus, "pending">
-  ) {
-    const flag = initialFlags.find((f) => f.id === id);
-    setFlagStatuses((prev) => ({ ...prev, [id]: status }));
+  const resolveFlag = useCallback(
+    (id: string, status: Exclude<FlagStatus, "pending">) => {
+      const flag = initialFlags.find((f) => f.id === id);
+      if (!flag) return;
 
-    if (!flag) return;
+      const fieldId = flag.fieldId;
+      const currentField =
+        initialFields.find((f) => f.id === fieldId) ??
+        fields.find((f) => f.id === fieldId);
 
-    const fieldId = flag.fieldId;
-    const currentField =
-      fields.find((f) => f.id === fieldId) ??
-      initialFields.find((f) => f.id === fieldId);
+      setFlagStatuses((prev) => ({ ...prev, [id]: status }));
 
-    if (status === "accepted") {
-      setFieldOverrides((prev) => ({
-        ...prev,
-        [fieldId]: { state: "verified", dismissed: false },
-      }));
-      return;
-    }
+      if (status === "accepted") {
+        setFieldOverrides((prev) => ({
+          ...prev,
+          [fieldId]: { state: "verified" },
+        }));
+      } else if (status === "rejected") {
+        // Keep original field state/value — only the flag is dismissed
+        setFieldOverrides((prev) => {
+          const next = { ...prev };
+          delete next[fieldId];
+          return next;
+        });
+      } else {
+        setFieldOverrides((prev) => ({
+          ...prev,
+          [fieldId]: {
+            state: "editable",
+            value: correctedValueForFlag(
+              flag,
+              currentField?.value ?? prev[fieldId]?.value ?? ""
+            ),
+          },
+        }));
+      }
 
-    if (status === "rejected") {
-      setFieldOverrides((prev) => ({
-        ...prev,
-        [fieldId]: {
-          ...prev[fieldId],
-          dismissed: true,
-        },
-      }));
-      return;
-    }
-
-    // edited
-    setFieldOverrides((prev) => ({
-      ...prev,
-      [fieldId]: {
-        state: "editable",
-        value: fakeEditedValue(currentField?.value ?? ""),
-        dismissed: false,
-      },
-    }));
-  }
+      // Close after state updates are scheduled
+      setActiveFlagId(null);
+    },
+    [initialFlags, initialFields, fields]
+  );
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
@@ -198,16 +206,13 @@ export function ReturnDetailView({
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1.5">
             <Badge variant="outline">{formatStatus(taxReturn.status)}</Badge>
-            {pendingCount > 0 ? (
-              <span className="text-[11px] text-muted-foreground">
-                {pendingCount} pending{" "}
-                {pendingCount === 1 ? "flag" : "flags"}
-              </span>
-            ) : (
-              <span className="text-[11px] text-muted-foreground">
-                No pending flags
-              </span>
-            )}
+            <span className="text-[11px] text-muted-foreground">
+              {pendingCount === 0
+                ? "No pending flags"
+                : pendingCount === 1
+                  ? "1 pending flag"
+                  : `${pendingCount} pending flags`}
+            </span>
           </div>
         </div>
       </header>
@@ -231,20 +236,28 @@ export function ReturnDetailView({
 
         <div className="overflow-hidden rounded-lg border border-border bg-card">
           <ul className="divide-y divide-border">
-            {fields.map((field) => (
-              <li key={field.id}>
-                <FieldRow
-                  field={field}
-                  pendingFlag={pendingFlagByFieldId[field.id] ?? null}
-                  dismissed={fieldOverrides[field.id]?.dismissed === true}
-                  onOpenSource={() => setSourceFieldId(field.id)}
-                  onOpenFlag={() => {
-                    const flag = pendingFlagByFieldId[field.id];
-                    if (flag) setFlagId(flag.id);
-                  }}
-                />
-              </li>
-            ))}
+            {fields.map((field) => {
+              const linkedFlag = flagByFieldId[field.id];
+              const pendingFlag = pendingFlagByFieldId[field.id] ?? null;
+              const resolvedStatus =
+                linkedFlag && linkedFlag.status !== "pending"
+                  ? linkedFlag.status
+                  : null;
+
+              return (
+                <li key={field.id}>
+                  <FieldRow
+                    field={field}
+                    pendingFlag={pendingFlag}
+                    resolvedStatus={resolvedStatus}
+                    onOpenSource={() => setSourceFieldId(field.id)}
+                    onOpenFlag={() => {
+                      if (linkedFlag) setActiveFlagId(linkedFlag.id);
+                    }}
+                  />
+                </li>
+              );
+            })}
           </ul>
         </div>
       </section>
@@ -259,9 +272,9 @@ export function ReturnDetailView({
       />
 
       <AIFlagDialog
-        open={flagId != null}
+        open={activeFlagId != null}
         onOpenChange={(open) => {
-          if (!open) setFlagId(null);
+          if (!open) setActiveFlagId(null);
         }}
         flag={activeFlag}
         field={flagField}

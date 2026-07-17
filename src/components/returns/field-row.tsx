@@ -4,14 +4,14 @@ import { FileSearch, Sparkles } from "lucide-react";
 
 import { FIELD_STATE_META } from "@/components/returns/field-state-meta";
 import { Badge } from "@/components/ui/badge";
-import type { AIFlag, ReturnField } from "@/lib/mock-data";
+import type { AIFlag, FlagStatus, ReturnField } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 interface FieldRowProps {
   field: ReturnField;
   pendingFlag: AIFlag | null;
-  /** True after the CPA rejected / dismissed the AI flag on this field */
-  dismissed?: boolean;
+  /** Resolved flag status for this field, if any */
+  resolvedStatus?: Exclude<FlagStatus, "pending"> | null;
   onOpenSource: () => void;
   onOpenFlag: () => void;
 }
@@ -19,7 +19,7 @@ interface FieldRowProps {
 export function FieldRow({
   field,
   pendingFlag,
-  dismissed = false,
+  resolvedStatus = null,
   onOpenSource,
   onOpenFlag,
 }: FieldRowProps) {
@@ -28,10 +28,13 @@ export function FieldRow({
   const hasSource = Boolean(field.sourceDocumentId || field.calculation);
   const isLocked = field.state === "locked";
   const isEditable = field.state === "editable";
-  const isInteractive = Boolean(pendingFlag) || hasSource;
+  const isDismissed = resolvedStatus === "rejected";
+  const hasResolvedFlag = resolvedStatus != null;
+  const isInteractive =
+    Boolean(pendingFlag) || hasResolvedFlag || hasSource;
 
   function handleRowClick() {
-    if (pendingFlag) {
+    if (pendingFlag || hasResolvedFlag) {
       onOpenFlag();
       return;
     }
@@ -57,11 +60,9 @@ export function FieldRow({
       }
       className={cn(
         "group border-l-[3px] px-3 py-2.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-        dismissed
-          ? "border-l-border bg-muted/40 opacity-75 hover:bg-muted/50"
-          : meta.rowClass,
+        meta.rowClass,
         isInteractive && "cursor-pointer",
-        isLocked && !pendingFlag && "cursor-default"
+        isLocked && !pendingFlag && !hasResolvedFlag && "cursor-default"
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -69,21 +70,19 @@ export function FieldRow({
           <span
             className={cn(
               "mt-0.5 flex size-5 shrink-0 items-center justify-center",
-              dismissed ? "text-muted-foreground" : meta.iconClass
+              meta.iconClass
             )}
-            title={dismissed ? "Flag dismissed" : meta.label}
+            title={meta.label}
           >
             <Icon className="size-3.5" aria-hidden />
-            <span className="sr-only">
-              {dismissed ? "Flag dismissed" : meta.label}
-            </span>
+            <span className="sr-only">{meta.label}</span>
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-sm font-medium leading-tight">
                 {field.label}
               </span>
-              {field.state === "needs-approval" && !dismissed ? (
+              {field.state === "needs-approval" && !isDismissed ? (
                 <Badge
                   variant="outline"
                   className="h-4 border-amber-300 bg-amber-100/80 px-1.5 text-[10px] text-amber-800"
@@ -91,12 +90,28 @@ export function FieldRow({
                   Review
                 </Badge>
               ) : null}
-              {dismissed ? (
+              {isDismissed ? (
                 <Badge
                   variant="secondary"
                   className="h-4 px-1.5 text-[10px] text-muted-foreground"
                 >
                   Dismissed
+                </Badge>
+              ) : null}
+              {resolvedStatus === "accepted" ? (
+                <Badge
+                  variant="outline"
+                  className="h-4 border-emerald-300 bg-emerald-50 px-1.5 text-[10px] text-emerald-800"
+                >
+                  Accepted
+                </Badge>
+              ) : null}
+              {resolvedStatus === "edited" ? (
+                <Badge
+                  variant="outline"
+                  className="h-4 px-1.5 text-[10px] text-muted-foreground"
+                >
+                  Edited
                 </Badge>
               ) : null}
             </div>
@@ -141,12 +156,12 @@ export function FieldRow({
           <span
             className={cn(
               "text-sm font-semibold tabular-nums",
-              dismissed ? "text-muted-foreground" : meta.valueClass
+              meta.valueClass
             )}
           >
             {field.value}
           </span>
-          {isEditable && !dismissed ? <PencilHint /> : null}
+          {isEditable ? <PencilHint /> : null}
         </div>
       </div>
     </div>
