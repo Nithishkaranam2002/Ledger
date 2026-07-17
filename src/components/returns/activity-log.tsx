@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, History, MoveRight } from "lucide-react";
 
 import type { AuditAction, AuditLogEntryDTO } from "@/lib/api-types";
@@ -37,6 +37,29 @@ interface ActivityLogProps {
 
 export function ActivityLog({ entries, fieldLabels }: ActivityLogProps) {
   const [open, setOpen] = useState(entries.length > 0);
+  const knownIdsRef = useRef<Set<string> | null>(null);
+  const [animatedIds, setAnimatedIds] = useState<Set<string>>(() => new Set());
+
+  // Animate only newly arrived entries (after an Accept/Reject/Edit), not the initial load
+  useEffect(() => {
+    if (knownIdsRef.current == null) {
+      knownIdsRef.current = new Set(entries.map((entry) => entry.id));
+      return;
+    }
+
+    const known = knownIdsRef.current;
+    const fresh = entries.filter((entry) => !known.has(entry.id));
+    if (fresh.length === 0) return;
+
+    for (const entry of fresh) known.add(entry.id);
+    setAnimatedIds(new Set(fresh.map((entry) => entry.id)));
+    setOpen(true);
+
+    const timer = window.setTimeout(() => {
+      setAnimatedIds(new Set());
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [entries]);
 
   return (
     <section aria-labelledby="activity-heading" className="mt-6">
@@ -61,7 +84,7 @@ export function ActivityLog({ entries, fieldLabels }: ActivityLogProps) {
           </span>
           <ChevronDown
             className={cn(
-              "size-3.5 text-muted-foreground transition-transform",
+              "size-3.5 text-muted-foreground transition-transform duration-200",
               open && "rotate-180"
             )}
             aria-hidden
@@ -85,9 +108,17 @@ export function ActivityLog({ entries, fieldLabels }: ActivityLogProps) {
                   entry.previousValue != null &&
                   entry.newValue != null &&
                   entry.previousValue !== entry.newValue;
+                const isNew = animatedIds.has(entry.id);
 
                 return (
-                  <li key={entry.id} className="px-3 py-2.5">
+                  <li
+                    key={entry.id}
+                    className={cn(
+                      "px-3 py-2.5",
+                      isNew &&
+                        "animate-in fade-in-0 slide-in-from-top-2 duration-300 fill-mode-both"
+                    )}
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-sm leading-tight">

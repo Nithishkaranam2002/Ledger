@@ -109,6 +109,14 @@ export function ReturnDetailView({
   const urgency = getDueUrgency(taxReturn.dueDate);
   const TypeIcon = client.type === "business" ? Building2 : User;
   const pendingCount = flags.filter((f) => f.status === "pending").length;
+  const hasAnyFlags = flags.length > 0;
+
+  const pendingFlagsSummary = (() => {
+    if (!hasAnyFlags) return "No AI flags — all fields clear";
+    if (pendingCount === 0) return "All AI flags resolved";
+    if (pendingCount === 1) return "1 pending flag";
+    return `${pendingCount} pending flags`;
+  })();
 
   async function resolveFlag(flagId: string, action: FlagAction) {
     if (!canModifyFlags) return;
@@ -157,6 +165,13 @@ export function ReturnDetailView({
       );
       setActiveFlagId(null);
 
+      const successMessages: Record<FlagAction, string> = {
+        accept: "Suggestion accepted — field marked verified.",
+        reject: "Suggestion rejected — flag dismissed.",
+        edit: "Value updated — field marked verified.",
+      };
+      toast.success(successMessages[action]);
+
       // Refresh the activity log so the new audit entry shows immediately
       fetch(`/api/returns/${taxReturn.id}/audit-log`)
         .then((res) => (res.ok ? res.json() : null))
@@ -183,7 +198,7 @@ export function ReturnDetailView({
           <ArrowLeft className="size-3.5" aria-hidden />
           Dashboard
         </Link>
-        <UserSwitcher />
+        <UserSwitcher quiet />
       </div>
 
       <header className="mb-4 border-b border-border pb-4">
@@ -214,15 +229,17 @@ export function ReturnDetailView({
           <div className="flex shrink-0 flex-col items-end gap-1.5">
             <Badge variant="outline">{formatStatus(taxReturn.status)}</Badge>
             <span className="text-[11px] text-muted-foreground">
-              {pendingCount === 0
-                ? "No pending flags"
-                : pendingCount === 1
-                  ? "1 pending flag"
-                  : `${pendingCount} pending flags`}
+              {pendingFlagsSummary}
             </span>
           </div>
         </div>
       </header>
+
+      {!hasAnyFlags ? (
+        <div className="mb-4 rounded-lg border border-dashed border-border bg-muted/20 px-3 py-2.5 text-center text-xs text-muted-foreground">
+          No AI flags on this return — all fields clear
+        </div>
+      ) : null}
 
       <div className="mb-4">
         <FieldStateLegend />

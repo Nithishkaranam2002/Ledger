@@ -157,7 +157,9 @@ export function AIFlagDialog({
                 Resolved: {flag.status}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                This AI flag has already been handled.
+                {canModify
+                  ? "This AI flag has already been handled."
+                  : "Already resolved — reviewers have read-only access."}
               </p>
             </div>
           )}

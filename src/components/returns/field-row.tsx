@@ -59,7 +59,7 @@ export function FieldRow({
           : undefined
       }
       className={cn(
-        "group border-l-[3px] px-3 py-2.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+        "group border-l-[3px] px-3 py-2.5 outline-none transition-[background-color,border-color] duration-300 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
         meta.rowClass,
         isInteractive && "cursor-pointer",
         isLocked && !pendingFlag && !hasResolvedFlag && "cursor-default"
@@ -68,8 +68,9 @@ export function FieldRow({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex items-start gap-2">
           <span
+            key={field.state}
             className={cn(
-              "mt-0.5 flex size-5 shrink-0 items-center justify-center",
+              "mt-0.5 flex size-5 shrink-0 items-center justify-center animate-in fade-in-0 zoom-in-95 duration-300",
               meta.iconClass
             )}
             title={meta.label}
