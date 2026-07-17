@@ -9,10 +9,12 @@ import { FieldRow } from "@/components/returns/field-row";
 import { FieldStateLegend } from "@/components/returns/field-state-legend";
 import { SourceTraceDialog } from "@/components/returns/source-trace-dialog";
 import { Badge } from "@/components/ui/badge";
+import { fakeEditedValue } from "@/lib/fake-edit";
 import type {
   AIFlag,
   Client,
   Document,
+  FieldState,
   FlagStatus,
   ReturnField,
   TaxReturn,
@@ -23,6 +25,12 @@ import {
   getDueUrgency,
 } from "@/lib/urgency";
 import { cn } from "@/lib/utils";
+
+interface FieldOverride {
+  state?: FieldState;
+  value?: string;
+  dismissed?: boolean;
+}
 
 interface ReturnDetailViewProps {
   taxReturn: TaxReturn;
@@ -35,7 +43,7 @@ interface ReturnDetailViewProps {
 export function ReturnDetailView({
   taxReturn,
   client,
-  fields,
+  fields: initialFields,
   documents,
   flags: initialFlags,
 }: ReturnDetailViewProps) {
@@ -43,6 +51,9 @@ export function ReturnDetailView({
     () =>
       Object.fromEntries(initialFlags.map((flag) => [flag.id, flag.status]))
   );
+  const [fieldOverrides, setFieldOverrides] = useState<
+    Record<string, FieldOverride>
+  >({});
 
   const flags = useMemo(
     () =>
@@ -51,6 +62,20 @@ export function ReturnDetailView({
         status: flagStatuses[flag.id] ?? flag.status,
       })),
     [initialFlags, flagStatuses]
+  );
+
+  const fields = useMemo(
+    () =>
+      initialFields.map((field) => {
+        const override = fieldOverrides[field.id];
+        if (!override) return field;
+        return {
+          ...field,
+          ...(override.state ? { state: override.state } : {}),
+          ...(override.value ? { value: override.value } : {}),
+        };
+      }),
+    [initialFields, fieldOverrides]
   );
 
   const documentsById = useMemo(
@@ -89,6 +114,50 @@ export function ReturnDetailView({
   const urgency = getDueUrgency(taxReturn.dueDate);
   const TypeIcon = client.type === "business" ? Building2 : User;
   const pendingCount = flags.filter((f) => f.status === "pending").length;
+
+  function resolveFlag(
+    id: string,
+    status: Exclude<FlagStatus, "pending">
+  ) {
+    const flag = initialFlags.find((f) => f.id === id);
+    setFlagStatuses((prev) => ({ ...prev, [id]: status }));
+
+    if (!flag) return;
+
+    const fieldId = flag.fieldId;
+    const currentField =
+      fields.find((f) => f.id === fieldId) ??
+      initialFields.find((f) => f.id === fieldId);
+
+    if (status === "accepted") {
+      setFieldOverrides((prev) => ({
+        ...prev,
+        [fieldId]: { state: "verified", dismissed: false },
+      }));
+      return;
+    }
+
+    if (status === "rejected") {
+      setFieldOverrides((prev) => ({
+        ...prev,
+        [fieldId]: {
+          ...prev[fieldId],
+          dismissed: true,
+        },
+      }));
+      return;
+    }
+
+    // edited
+    setFieldOverrides((prev) => ({
+      ...prev,
+      [fieldId]: {
+        state: "editable",
+        value: fakeEditedValue(currentField?.value ?? ""),
+        dismissed: false,
+      },
+    }));
+  }
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
@@ -134,7 +203,11 @@ export function ReturnDetailView({
                 {pendingCount} pending{" "}
                 {pendingCount === 1 ? "flag" : "flags"}
               </span>
-            ) : null}
+            ) : (
+              <span className="text-[11px] text-muted-foreground">
+                No pending flags
+              </span>
+            )}
           </div>
         </div>
       </header>
@@ -163,6 +236,7 @@ export function ReturnDetailView({
                 <FieldRow
                   field={field}
                   pendingFlag={pendingFlagByFieldId[field.id] ?? null}
+                  dismissed={fieldOverrides[field.id]?.dismissed === true}
                   onOpenSource={() => setSourceFieldId(field.id)}
                   onOpenFlag={() => {
                     const flag = pendingFlagByFieldId[field.id];
@@ -192,9 +266,7 @@ export function ReturnDetailView({
         flag={activeFlag}
         field={flagField}
         evidenceDocs={evidenceDocs}
-        onResolve={(id, status) => {
-          setFlagStatuses((prev) => ({ ...prev, [id]: status }));
-        }}
+        onResolve={resolveFlag}
       />
     </main>
   );

@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 interface FieldRowProps {
   field: ReturnField;
   pendingFlag: AIFlag | null;
+  /** True after the CPA rejected / dismissed the AI flag on this field */
+  dismissed?: boolean;
   onOpenSource: () => void;
   onOpenFlag: () => void;
 }
@@ -17,6 +19,7 @@ interface FieldRowProps {
 export function FieldRow({
   field,
   pendingFlag,
+  dismissed = false,
   onOpenSource,
   onOpenFlag,
 }: FieldRowProps) {
@@ -54,9 +57,11 @@ export function FieldRow({
       }
       className={cn(
         "group border-l-[3px] px-3 py-2.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-        meta.rowClass,
+        dismissed
+          ? "border-l-border bg-muted/40 opacity-75 hover:bg-muted/50"
+          : meta.rowClass,
         isInteractive && "cursor-pointer",
-        isLocked && "cursor-default"
+        isLocked && !pendingFlag && "cursor-default"
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -64,24 +69,34 @@ export function FieldRow({
           <span
             className={cn(
               "mt-0.5 flex size-5 shrink-0 items-center justify-center",
-              meta.iconClass
+              dismissed ? "text-muted-foreground" : meta.iconClass
             )}
-            title={meta.label}
+            title={dismissed ? "Flag dismissed" : meta.label}
           >
             <Icon className="size-3.5" aria-hidden />
-            <span className="sr-only">{meta.label}</span>
+            <span className="sr-only">
+              {dismissed ? "Flag dismissed" : meta.label}
+            </span>
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-sm font-medium leading-tight">
                 {field.label}
               </span>
-              {field.state === "needs-approval" ? (
+              {field.state === "needs-approval" && !dismissed ? (
                 <Badge
                   variant="outline"
                   className="h-4 border-amber-300 bg-amber-100/80 px-1.5 text-[10px] text-amber-800"
                 >
                   Review
+                </Badge>
+              ) : null}
+              {dismissed ? (
+                <Badge
+                  variant="secondary"
+                  className="h-4 px-1.5 text-[10px] text-muted-foreground"
+                >
+                  Dismissed
                 </Badge>
               ) : null}
             </div>
@@ -126,14 +141,12 @@ export function FieldRow({
           <span
             className={cn(
               "text-sm font-semibold tabular-nums",
-              meta.valueClass
+              dismissed ? "text-muted-foreground" : meta.valueClass
             )}
           >
             {field.value}
           </span>
-          {isEditable ? (
-            <PencilHint />
-          ) : null}
+          {isEditable && !dismissed ? <PencilHint /> : null}
         </div>
       </div>
     </div>
