@@ -1,119 +1,362 @@
 # Ledger
 
-An AI-powered tax platform prototype for CPAs. Built from scratch for the AI Engineer
-case study. Ledger is designed around one question a preparer asks all day —
-*"can I trust this number, and what should I do about it?"* — and answers it with
-traceable source documents, a consistent affordance system, transparent AI, and an
-action-oriented dashboard.
+### An AI-powered tax review workspace built around traceability, clear next actions, and human control.
 
-This is a **working, clickable prototype**, not production software. The AI is
-simulated; the app underneath it is real (Next.js + Postgres + Prisma).
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-persistent-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Prisma](https://img.shields.io/badge/Prisma-ORM-2D3748?style=flat-square&logo=prisma)](https://www.prisma.io/)
 
-**Repo:** https://github.com/Nithishkaranam2002/Ledger
+> Candidate case study for an AI Engineer role. The frontend is a working,
+> clickable product; AI outputs and source documents are intentionally simulated
+> so the prototype can focus on interaction design, trust, and workflow.
 
-## 5-minute walkthrough (for reviewers)
+![Ledger preparer dashboard](public/screenshots/dashboard-preparer.png)
 
-1. Open the **dashboard** — returns are urgency-ranked (Overdue → Due This Week → Needs Review → On Track). Each card shows a **Next:** owner + reason.
-2. Switch users (top-right): **Sarah Kim** (preparer queue) → **David Torres** (firm-wide, read-only flags) → **Priya Nair** (All Preparers filter).
-3. Open **Margaret Chen** (`/returns/return-01`):
-   - Status stepper + **Next** line (client request / AI flags / ownership)
-   - Tabs: **Fields | Documents | Flags | Requests | Activity**
-   - Click a value with “View source” → document, page, calculation path
-   - Open an AI flag → confidence, reasoning, evidence, Accept / Reject / Edit (persists + audit log)
-   - **Requests** tab → internal vs client-visible threads tied to fields/flags
-4. Deep link: `/returns/return-01?tab=flags&flag=flag-01` opens the flag in context.
-5. Open **Elena Vasquez** (`/returns/return-05`) for the clean empty-flags state.
+## The product
 
-## Challenges covered
+Tax software often asks professionals to trust a number without making it easy to
+answer the questions that matter:
 
-The brief lists ten challenges. Ledger goes deep on a **coherent CPA workflow** rather than ten disconnected demos:
+- Where did this value come from?
+- What changed, and why did AI flag it?
+- What evidence supports the recommendation?
+- Who needs to act next?
+- Can I safely accept, reject, or correct it?
 
-| # | Challenge | Status | Where to see it |
-|---|-----------|--------|-----------------|
-| 01 | Source Document Traceability | **Built** | Field → “View source” → document, page, calculation |
-| 02 | Client & CPA Collaboration | **Built (scoped)** | Requests tab — internal vs client threads, next owner, links to flags |
-| 03 | Where to Start (client first-run) | **Deferred** | CPA-first product; client onboarding called out as next surface |
-| 04 | Navigation / context | **Built** | Breadcrumbs, section tabs, `?tab=` / `?flag=` deep links |
-| 05 | Role-Aware Experiences | **Built (firm-side)** | Preparer / Reviewer / Firm Admin switcher |
-| 06 | Return Status & Progress | **Built** | Stepper + shared Next owner/reason on detail + cards |
-| 07 | Actionable Dashboard | **Built** | Urgency buckets + prioritization logic |
-| 08 | Clickable vs. Editable | **Built** | Five field states + legend; editable fields open a real edit dialog |
-| 09 | Complexity Made Navigable | **Lite** | Field filters (All / Needs attention / AI-generated / Has source); full “hundreds of docs” scale deferred |
-| 10 | Trustworthy AI | **Built** | Confidence, reasoning, evidence, Accept/Reject/Edit + audit log |
+I designed Ledger as one connected CPA workflow instead of a collection of
+unrelated feature demos:
 
-**Why not all ten fully?** The brief rewards a real clickable product and defensible decisions over exhaustive shallow coverage. 03 (client onboarding) and full 09 (volume search) would splinter into separate products; they are honest future extensions, not faked screens.
+```text
+Prioritized dashboard
+        ↓
+Return status + next owner
+        ↓
+Fields ↔ Documents ↔ AI flags ↔ Requests ↔ Activity
+        ↓
+Human decision, persistence, and audit trail
+```
 
-## What's real vs. simulated
+The result is a focused review workspace where every AI recommendation is
+explainable, every important value is traceable, and every decision remains under
+human control.
 
-**Real (genuinely wired up):**
-- Next.js App Router (Server Components for fetch, Client Components for interaction)
-- PostgreSQL + Prisma — clients, returns, documents, fields, AI flags, audit log
-- REST API the UI actually calls (`/api/returns`, `/api/flags/[id]`, `/api/fields/[id]`, audit-log)
-- Flag + field edits persist and appear in the Activity Log after refresh
-- Urgency ranking, role-scoped dashboard, loading/error/empty states, toasts
+## Product tour
 
-**Simulated (fabricated, per the brief):**
-- AI confidence / reasoning / evidence / suggested actions (hand-authored)
-- “Edit manually” correction values (`src/lib/fake-edit.ts`)
-- Document OCR / real PDFs (metadata + placeholder thumbnails)
-- Roles / auth (in-memory switcher; no server permission enforcement)
-- Collaboration threads (hardcoded in `src/lib/mock-data/mock-collaboration.ts`)
+### 1. Actionable work, not dashboard decoration
 
-## Sample data
+The landing page ranks returns by urgency—**Overdue**, **Due This Week**,
+**Needs Your Review**, and **On Track**—then shows the owner and next action on
+every card. A preparer sees their queue; a firm administrator sees all preparers
+and can narrow the view.
 
-6 clients · 8 returns · 22 documents · 48 fields · 4 AI flags · seeded collaboration threads.
+<p align="center">
+  <img src="public/screenshots/dashboard-preparer.png" alt="Preparer dashboard showing urgency-ranked returns" width="49%" />
+  <img src="public/screenshots/dashboard-admin.png" alt="Firm administrator dashboard showing all preparers" width="49%" />
+</p>
 
-Best demos: `return-01` (Margaret Chen), `return-05` (Elena Vasquez, clean).
+### 2. Shared status and clear ownership
 
-## Running locally
+Each return has a five-stage progress model—**Documents → Preparation → Review →
+Ready → Filed**—plus one unambiguous next-action line. Tabs preserve context while
+the reviewer moves among fields, documents, flags, requests, and activity.
 
-**Requirements:** Node **≥ 20.9**, [pnpm](https://pnpm.io), Docker.
+![Return review workspace](public/screenshots/return-review.png)
+
+### 3. Every number can defend itself
+
+Selecting **View source** reveals the source document, exact page, extracted value,
+and any calculation applied. The trace is attached to the field, so review never
+loses its context.
+
+![Source document trace showing document, page, extracted value, and calculation](public/screenshots/source-trace.png)
+
+### 4. AI that explains before it asks for trust
+
+AI flags include:
+
+- A plain-language issue statement
+- Confidence with a visual uncertainty signal
+- Reasoning that explains the comparison
+- Supporting evidence
+- A recommended next action
+- Explicit **Accept**, **Reject**, and **Edit manually** controls
+
+Every action updates the field, persists through the API, and creates an activity
+record. Reviewers receive the same evidence but read-only controls.
+
+![Trustworthy AI review dialog](public/screenshots/ai-review.png)
+
+### 5. Collaboration stays attached to the work
+
+Requests and notes are tied to the return and can link directly to a field,
+document, or AI flag. Internal notes are visually distinct from client-visible
+requests, and each open item names who owes the next action.
+
+![Contextual requests and notes](public/screenshots/collaboration.png)
+
+## Role-aware experience
+
+The top-right switcher demonstrates how one product shell adapts for different
+firm responsibilities:
+
+| Demo user | Role | Experience |
+| --- | --- | --- |
+| **Sarah Kim** | CPA / Preparer | Assigned return queue; full Accept, Reject, Edit, and manual field correction |
+| **David Torres** | Reviewer | Firm-wide visibility and audit history; AI decisions are read-only |
+| **Priya Nair** | Firm Admin | Firm-wide dashboard with an explicit **All Preparers** filter; full action access |
+
+This is intentionally a frontend role simulation rather than production
+authentication. The UI communicates permissions clearly without pretending the
+prototype includes a real identity system.
+
+## Case-study challenge coverage
+
+I prioritized a cohesive professional workflow over ten disconnected screens.
+
+| # | Challenge | Coverage | Demonstrated by |
+| --- | --- | --- | --- |
+| 01 | Source Document Traceability | **Deep** | Field → document → page → extracted value → calculation |
+| 02 | Client & CPA Collaboration | **Scoped** | Contextual requests, internal/client visibility, next owner |
+| 03 | Where to Start | **Deferred** | The prototype is intentionally CPA-first; client onboarding is a future surface |
+| 04 | Navigation & Context | **Deep** | Breadcrumbs, tabs, and `?tab=` / `?flag=` deep links |
+| 05 | Role-Aware Experiences | **Firm-side** | Preparer, reviewer, and admin views |
+| 06 | Return Status & Progress | **Deep** | Shared stepper, completeness, blockers, and next owner |
+| 07 | Actionable Dashboard | **Deep** | Date/flag-based urgency logic and action-oriented cards |
+| 08 | Clickable vs. Editable | **Deep** | Five field states, persistent legend, real editable-field flow |
+| 09 | Complexity Made Navigable | **Focused** | Summary/detail hierarchy and field filters; large-volume search is deferred |
+| 10 | Trustworthy AI | **Deep** | Confidence, reasoning, evidence, correction controls, audit trail |
+
+### Why I did not fake all ten
+
+The brief values a genuinely testable interface and defensible decisions over
+exhaustive shallow coverage. A full client-onboarding application and a
+hundreds-of-documents search product would be separate product surfaces. I chose
+to make the CPA review loop complete, honest, and demonstrable instead.
+
+## How I built it
+
+### 1. Started with the workflow, not the screens
+
+I first modeled the job a CPA is trying to complete:
+
+1. Identify the most urgent return.
+2. Understand current status and ownership.
+3. Review fields that require attention.
+4. Trace a value to evidence.
+5. Understand and resolve an AI recommendation.
+6. Preserve the decision for the next reviewer.
+
+That sequence became the information architecture and kept each challenge
+connected to the next.
+
+### 2. Defined a small but varied domain model
+
+The seed dataset includes:
+
+- 6 individual and business clients
+- 8 returns across five statuses
+- 22 source documents
+- 48 return fields across five interaction states
+- 4 AI flags with different confidence/evidence patterns
+- Internal notes, client requests, clean returns, overdue work, and resolved states
+
+The variety makes the prototype testable beyond a single happy path.
+
+### 3. Built the frontend against typed mock contracts
+
+I established TypeScript models for clients, returns, documents, fields, AI
+flags, and audit entries. Those contracts let the frontend interaction system
+stabilize before database work, while keeping the later API migration predictable.
+
+### 4. Added a real persistence path
+
+The finished app uses PostgreSQL and Prisma. Server Components load the initial
+view, Client Components manage interaction, and route handlers persist field/flag
+decisions and write audit entries.
+
+```mermaid
+flowchart LR
+    User[CPA or reviewer] --> UI[Next.js UI]
+    UI --> Server[Server Components]
+    UI --> API[Route handlers]
+    Server --> Data[Data access layer]
+    API --> Prisma[Prisma ORM]
+    Data --> Prisma
+    Prisma --> DB[(PostgreSQL)]
+    API --> Audit[Audit log entry]
+    Audit --> DB
+```
+
+### 5. Polished trust-critical state changes
+
+Accept, Reject, Edit, and manual correction include loading states, action-specific
+toasts, field-state transitions, and an animated audit entry. Invalid IDs, empty
+flags, slow navigation, and database errors have explicit fallback states.
+
+## Interaction language
+
+Ledger never relies on color alone. Every field state combines a left border,
+icon, label, value treatment, and interaction behavior:
+
+| State | Meaning | Interaction |
+| --- | --- | --- |
+| **AI-generated** | Extracted or calculated by AI | Inspect source/calculation |
+| **Verified** | Confirmed against evidence | Read-only settled value |
+| **Editable** | Open for a human correction | Click → edit → save and verify |
+| **Needs approval** | Requires professional judgment | Open AI reasoning and decide |
+| **Locked** | Fixed by rule or prior filing | Read-only with lock cue |
+
+## What is real vs. simulated
+
+### Genuinely wired
+
+- Next.js App Router frontend with Server and Client Components
+- PostgreSQL database through Prisma ORM
+- API routes for returns, flags, field edits, and audit history
+- Persistent Accept / Reject / Edit flows
+- Manual field corrections with audit entries
+- Due-date and pending-flag prioritization logic
+- Role-aware frontend views
+- Loading skeletons, error boundaries, empty states, animations, and toasts
+
+### Intentionally simulated
+
+- AI confidence, reasoning, evidence, and recommendations are authored fixtures
+- “Edit manually” generates a plausible corrected value through a stub
+- Document OCR and PDFs are represented by trace metadata and thumbnails
+- Role switching uses React Context; there is no real authentication
+- Collaboration threads are seeded frontend data, not a messaging backend
+
+This boundary is deliberate: the assessment asks how AI output should be
+presented and trusted, not for a production OCR or model-training pipeline.
+
+## Architecture
+
+```text
+src/
+├── app/
+│   ├── api/                         # Returns, flags, fields, audit log
+│   ├── returns/[id]/                # Return review route + loading/404
+│   └── page.tsx                     # Dashboard route
+├── components/
+│   ├── dashboard/                   # Prioritized return queue
+│   ├── returns/                     # Review, trace, AI, status, activity
+│   └── ui/                          # shadcn/ui primitives
+└── lib/
+    ├── data/returns.ts              # Shared server-side queries
+    ├── mock-data/                   # Seed fixtures + collaboration demo
+    ├── urgency.ts                   # Prioritization logic
+    ├── return-progress.ts           # Status and next-action logic
+    ├── serializers.ts               # DB → wire-format mapping
+    └── current-user-context.tsx     # Demo role context
+
+prisma/
+├── schema.prisma                    # Relational domain model
+├── migrations/                      # Reproducible schema
+└── seed.ts                          # Deterministic demo data
+```
+
+## Tech stack
+
+- **Frontend:** Next.js 16, React 19, TypeScript
+- **UI:** Tailwind CSS v4, shadcn/ui, Lucide icons, Sonner
+- **Data:** PostgreSQL, Prisma 7, `pg`
+- **Tooling:** pnpm, ESLint, Docker Compose
+
+## Run locally
+
+### Prerequisites
+
+- Node.js **20.9+**
+- [pnpm](https://pnpm.io/)
+- Docker Desktop
+
+### Setup
 
 ```bash
+git clone https://github.com/Nithishkaranam2002/Ledger.git
+cd Ledger
+
 pnpm install
 docker compose up -d
-cp .env.example .env   # if you don't already have .env
-pnpm exec prisma generate
+cp .env.example .env
+
 pnpm db:deploy
 pnpm db:seed
 pnpm dev
 ```
 
-Open http://localhost:3000.
+Open [http://localhost:3000](http://localhost:3000). If that port is occupied,
+Next.js will print the alternate local URL.
 
-Default `.env`:
+The default local database URL is:
 
-```
+```env
 DATABASE_URL="postgresql://postgres:ledger@localhost:5435/ledger"
 ```
 
-## Deploying (Vercel + hosted Postgres)
-
-Build is production-ready (`prisma generate` runs on `postinstall` / `build`).
-
-1. Create a Postgres database (Neon or Vercel Postgres). Copy the connection string (use `?sslmode=require` if required).
-2. Apply schema + seed against that URL:
+### Useful commands
 
 ```bash
-DATABASE_URL="postgresql://..." pnpm db:deploy
-DATABASE_URL="postgresql://..." pnpm db:seed
+pnpm dev          # Start development server
+pnpm build        # Generate Prisma client + production build
+pnpm lint         # Run ESLint across the project
+pnpm db:deploy    # Apply tracked migrations
+pnpm db:seed      # Reset and seed deterministic demo data
 ```
 
-3. Import https://github.com/Nithishkaranam2002/Ledger into Vercel.
-4. Set env `DATABASE_URL` for Production (and Preview if you want).
-5. Deploy. Set Node.js **20.x** in Project Settings if prompted.
+## Deploy
 
-Smoke test after deploy: `/` → `return-01` accept a flag → refresh → Activity tab → switch to Reviewer → confirm read-only.
+The repository is prepared for Vercel. `prisma generate` runs during install and
+build.
 
-## Tech stack
+1. Create hosted PostgreSQL (Neon, Vercel Postgres, or equivalent).
+2. Apply and seed it:
 
-Next.js 16 · React 19 · TypeScript · Tailwind CSS v4 · shadcn/ui · Prisma 7 ·
-PostgreSQL · Sonner.
+```bash
+DATABASE_URL="postgresql://...?...sslmode=require" pnpm db:deploy
+DATABASE_URL="postgresql://...?...sslmode=require" pnpm db:seed
+```
 
-## Notable design decisions
+3. Import this GitHub repository into Vercel.
+4. Add `DATABASE_URL` to Production (and Preview if desired).
+5. Deploy with Node.js 20.x.
 
-- **One connected flow.** Dashboard → return → fields/docs/flags/requests → source → AI decision.
-- **Affordance = color + icon + border.** Field state is never one cue alone.
-- **AI suggests; humans decide.** Every flag resolution is explicit and audited.
-- **Status means the same thing to everyone.** Stepper + a single Next owner/reason line.
-- **Collaboration stays contextual.** Threads hang off the return (and specific fields/flags), not a generic inbox.
+## Verification
+
+The current submission has been checked with:
+
+```bash
+pnpm lint
+pnpm exec tsc --noEmit
+pnpm build
+```
+
+Recommended smoke test:
+
+1. Dashboard loads role-scoped returns.
+2. `/returns/return-01` shows two pending flags.
+3. Accept a flag and refresh—the state and Activity Log persist.
+4. Switch to David Torres—the dialog becomes read-only.
+5. `/returns/return-05` shows the clean zero-flags state.
+
+## Design tradeoffs and next steps
+
+Given more time, I would:
+
+1. Add a true split-pane PDF viewer with highlighted source coordinates.
+2. Add a client-first onboarding surface for challenge 03.
+3. Generate a high-volume document corpus and add full-text/filter search.
+4. Replace the role simulation with authenticated, server-enforced permissions.
+5. Add automated component, API, accessibility, and visual-regression tests.
+6. Add an AI evaluation harness for extraction quality, confidence calibration,
+   correction rate, and reviewer agreement.
+
+For this assessment, I deliberately kept OCR, AI generation, authentication, and
+messaging simulated while making the core review workflow real, persistent, and
+fully clickable.
+
+---
+
+Built by **Nithish Karanam** for the AI Engineer case study · July 2026
