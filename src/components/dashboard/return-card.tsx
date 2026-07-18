@@ -3,7 +3,9 @@ import { Building2, TriangleAlert, User } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { hasOpenClientRequest } from "@/lib/mock-data";
 import type { Client, TaxReturn } from "@/lib/mock-data";
+import { computeNextAction } from "@/lib/return-progress";
 import {
   formatDueDate,
   formatStatus,
@@ -37,6 +39,9 @@ export function ReturnCard({
 }: ReturnCardProps) {
   const urgency = getDueUrgency(taxReturn.dueDate);
   const TypeIcon = client.type === "business" ? Building2 : User;
+  const next = computeNextAction(taxReturn, pendingFlagCount, {
+    outstandingClientRequest: hasOpenClientRequest(taxReturn.id),
+  });
 
   return (
     <Link href={`/returns/${taxReturn.id}`} className="block">
@@ -99,6 +104,13 @@ export function ReturnCard({
               {taxReturn.completenessPercent}%
             </span>
           </div>
+
+          {taxReturn.status !== "filed" ? (
+            <p className="truncate text-[11px] leading-snug text-muted-foreground">
+              <span className="font-medium text-foreground/80">Next:</span>{" "}
+              {next.owner} · {next.reason}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
     </Link>

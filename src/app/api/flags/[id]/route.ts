@@ -127,7 +127,8 @@ export async function PATCH(
     });
     const nextField = await tx.returnField.update({
       where: { id: field.id },
-      data: { value: body.newValue!, state: "editable" },
+      // Human correction settles the value — same trust signal as Accept
+      data: { value: body.newValue!, state: "verified" },
     });
     await tx.auditLogEntry.create({
       data: {

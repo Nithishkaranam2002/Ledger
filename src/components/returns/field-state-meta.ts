@@ -37,7 +37,7 @@ export const FIELD_STATE_META: Record<
   },
   editable: {
     label: "Editable",
-    description: "Open for manual entry or correction",
+    description: "Click to enter or correct the value",
     rowClass: "border-l-transparent hover:bg-muted/50",
     valueClass: "text-foreground",
     iconClass: "text-muted-foreground",

@@ -14,6 +14,8 @@ interface FieldRowProps {
   resolvedStatus?: Exclude<FlagStatus, "pending"> | null;
   onOpenSource: () => void;
   onOpenFlag: () => void;
+  /** Manual edit for editable fields (no pending flag) */
+  onEdit?: () => void;
 }
 
 export function FieldRow({
@@ -22,6 +24,7 @@ export function FieldRow({
   resolvedStatus = null,
   onOpenSource,
   onOpenFlag,
+  onEdit,
 }: FieldRowProps) {
   const meta = FIELD_STATE_META[field.state];
   const Icon = meta.Icon;
@@ -30,12 +33,20 @@ export function FieldRow({
   const isEditable = field.state === "editable";
   const isDismissed = resolvedStatus === "rejected";
   const hasResolvedFlag = resolvedStatus != null;
+  const canEditManually = isEditable && !pendingFlag && Boolean(onEdit);
   const isInteractive =
-    Boolean(pendingFlag) || hasResolvedFlag || hasSource;
+    Boolean(pendingFlag) ||
+    hasResolvedFlag ||
+    hasSource ||
+    canEditManually;
 
   function handleRowClick() {
     if (pendingFlag || hasResolvedFlag) {
       onOpenFlag();
+      return;
+    }
+    if (canEditManually) {
+      onEdit?.();
       return;
     }
     if (hasSource) {
@@ -89,6 +100,14 @@ export function FieldRow({
                   className="h-4 border-amber-300 bg-amber-100/80 px-1.5 text-[10px] text-amber-800"
                 >
                   Review
+                </Badge>
+              ) : null}
+              {isEditable ? (
+                <Badge
+                  variant="outline"
+                  className="h-4 px-1.5 text-[10px] text-muted-foreground"
+                >
+                  Editable
                 </Badge>
               ) : null}
               {isDismissed ? (
@@ -149,6 +168,11 @@ export function FieldRow({
                   </Badge>
                 </button>
               ) : null}
+              {canEditManually ? (
+                <span className="text-[11px] font-medium text-muted-foreground">
+                  Click to edit
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
@@ -162,24 +186,8 @@ export function FieldRow({
           >
             {field.value}
           </span>
-          {isEditable ? <PencilHint /> : null}
         </div>
       </div>
     </div>
-  );
-}
-
-function PencilHint() {
-  const { Icon, iconClass } = FIELD_STATE_META.editable;
-  return (
-    <span
-      className={cn(
-        "opacity-0 transition-opacity group-hover:opacity-100",
-        iconClass
-      )}
-      aria-hidden
-    >
-      <Icon className="size-3.5" />
-    </span>
   );
 }
