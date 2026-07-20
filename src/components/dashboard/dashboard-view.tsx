@@ -45,6 +45,18 @@ export function DashboardView({ returns }: DashboardViewProps) {
     0
   );
 
+  /** First card in the highest-urgency non-empty section — the clear next click. */
+  const startHereId = useMemo(() => {
+    for (const section of SECTION_ORDER) {
+      const list = grouped[section];
+      if (list.length === 0) continue;
+      // Prefer a flagged return in this section when available
+      const withFlags = list.find((r) => r.flagCount > 0);
+      return (withFlags ?? list[0]).id;
+    }
+    return null;
+  }, [grouped]);
+
   const attentionSummary = (() => {
     const base =
       attentionCount === 0
@@ -132,6 +144,7 @@ export function DashboardView({ returns }: DashboardViewProps) {
                       taxReturn={taxReturn}
                       client={taxReturn.client}
                       pendingFlagCount={taxReturn.flagCount}
+                      isStartHere={taxReturn.id === startHereId}
                     />
                   </li>
                 ))}

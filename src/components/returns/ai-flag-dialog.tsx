@@ -180,38 +180,46 @@ export function AIFlagDialog({
 
           {isPending && canModify ? (
             <DialogFooter className="sm:justify-stretch">
-              <div className="flex w-full flex-col gap-2 sm:flex-row">
+              <div
+                className="flex w-full flex-col gap-2 sm:flex-row"
+                role="group"
+                aria-label="Resolve AI flag"
+              >
                 <button
                   type="button"
+                  autoFocus
                   disabled={isSaving}
+                  aria-busy={resolvingAction === "accept"}
                   className={cn(buttonVariants(), "flex-1")}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={() => onResolve(flag.id, "accept")}
                 >
                   {resolvingAction === "accept" ? (
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden />
                   ) : (
-                    <Check className="size-3.5" />
+                    <Check className="size-3.5" aria-hidden />
                   )}
                   {resolvingAction === "accept" ? "Saving…" : "Accept suggestion"}
                 </button>
                 <button
                   type="button"
                   disabled={isSaving}
+                  aria-busy={resolvingAction === "reject"}
                   className={cn(buttonVariants({ variant: "outline" }), "flex-1")}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={() => onResolve(flag.id, "reject")}
                 >
                   {resolvingAction === "reject" ? (
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden />
                   ) : (
-                    <X className="size-3.5" />
+                    <X className="size-3.5" aria-hidden />
                   )}
                   {resolvingAction === "reject" ? "Saving…" : "Reject"}
                 </button>
                 <button
                   type="button"
                   disabled={isSaving}
+                  aria-busy={resolvingAction === "edit"}
                   className={cn(
                     buttonVariants({ variant: "secondary" }),
                     "flex-1"
@@ -220,9 +228,9 @@ export function AIFlagDialog({
                   onClick={() => onResolve(flag.id, "edit")}
                 >
                   {resolvingAction === "edit" ? (
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden />
                   ) : (
-                    <Pencil className="size-3.5" />
+                    <Pencil className="size-3.5" aria-hidden />
                   )}
                   {resolvingAction === "edit" ? "Saving…" : "Edit manually"}
                 </button>

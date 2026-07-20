@@ -30,12 +30,15 @@ interface ReturnCardProps {
   taxReturn: TaxReturn;
   client: Client;
   pendingFlagCount: number;
+  /** Soft cue for the highest-urgency first card. */
+  isStartHere?: boolean;
 }
 
 export function ReturnCard({
   taxReturn,
   client,
   pendingFlagCount,
+  isStartHere = false,
 }: ReturnCardProps) {
   const urgency = getDueUrgency(taxReturn.dueDate);
   const TypeIcon = client.type === "business" ? Building2 : User;
@@ -44,10 +47,21 @@ export function ReturnCard({
   });
 
   return (
-    <Link href={`/returns/${taxReturn.id}`} className="block">
+    <Link
+      href={`/returns/${taxReturn.id}`}
+      className="block"
+      aria-label={
+        isStartHere
+          ? `${client.name}, tax year ${taxReturn.taxYear} — start here`
+          : undefined
+      }
+    >
       <Card
         size="sm"
-        className="transition-colors hover:bg-muted/40 hover:ring-foreground/20"
+        className={cn(
+          "transition-colors hover:bg-muted/40 hover:ring-foreground/20",
+          isStartHere && "ring-2 ring-foreground/25 bg-muted/20"
+        )}
       >
         <CardContent className="flex flex-col gap-2.5 py-0">
           <div className="flex items-start justify-between gap-3">
@@ -56,8 +70,18 @@ export function ReturnCard({
                 <TypeIcon className="size-3.5" aria-hidden />
               </div>
               <div className="min-w-0">
-                <div className="truncate font-medium leading-tight">
-                  {client.name}
+                <div className="flex items-center gap-2">
+                  <div className="truncate font-medium leading-tight">
+                    {client.name}
+                  </div>
+                  {isStartHere ? (
+                    <Badge
+                      variant="secondary"
+                      className="shrink-0 text-[10px] font-semibold tracking-wide uppercase"
+                    >
+                      Start here
+                    </Badge>
+                  ) : null}
                 </div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                   <span>TY {taxReturn.taxYear}</span>

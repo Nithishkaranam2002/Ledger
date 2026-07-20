@@ -25,10 +25,12 @@
 ## Try it in 60 seconds
 
 1. Open **[https://ledger-rho-vert.vercel.app](https://ledger-rho-vert.vercel.app)**
-2. Open the highest-urgency return (e.g. **return-01**)
-3. Go to **Flags** → open a pending AI flag → **Accept**
-4. Refresh — the decision stays, and an **Activity** entry is written
-5. Switch the top-right user to **David Torres** — the same dialog becomes read-only
+2. Click the **Start here** card on the dashboard (highest-urgency return)
+3. Expand **Field states** if you want the legend; otherwise jump straight to the numbers
+4. Click **View source** on a field — side-by-side document preview ↔ return value
+5. Go to **Flags** → open a pending AI flag → **Accept** (Tab focuses Accept first)
+6. Refresh — the decision stays, and an **Activity** entry is written
+7. Switch the top-right user to **David Torres** — the same dialog becomes read-only
 
 Hosted on **Vercel** with **Neon** PostgreSQL. Accept / Reject / Edit and manual field edits persist across refreshes.
 
@@ -79,7 +81,7 @@ Each return uses a five-stage model — **Documents → Preparation → Review �
 
 ### 3. Every number can defend itself
 
-**View source** reveals the source document, exact page, extracted value, and any calculation applied — attached to the field so review never loses context.
+**View source** opens a side-by-side review: a simulated document page with the extracted region highlighted on the left, and the return field, page reference, and calculation path on the right.
 
 ![Source document trace showing document, page, extracted value, and calculation](public/screenshots/source-trace.png)
 
